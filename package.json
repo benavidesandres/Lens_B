@@ -1,0 +1,25 @@
+{
+  "name": "lens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LENS: descubre lo interesante que hay a tu alrededor.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace @lens/server",
+    "dev:mobile": "npm run start --workspace @lens/mobile",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}
