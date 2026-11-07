@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.lens.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LENS usa tu ubicación para mostrarte lugares interesantes cerca de ti. No se guarda ni se comparte."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,11 +23,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.lens.app"
+      "package": "com.lens.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     },
     "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "output": "single"
     },
     "plugins": [
       "expo-router",
@@ -34,6 +38,12 @@
           "backgroundColor": "#F4F1EA",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "LENS usa tu ubicación para mostrarte lugares interesantes cerca de ti. No se guarda ni se comparte."
         }
       ]
     ],
