@@ -2,7 +2,6 @@ import { distanceMeters, type RoutePlan } from '@lens/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Polyline } from 'react-native-maps';
 
 import { useRoutePlan } from '@/api/queries';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import { useLocation } from '@/features/location/location-provider';
 import { LensMap } from '@/features/places/lens-map';
 import { PlaceMarker } from '@/features/places/place-marker';
 import { PlaceRow } from '@/features/places/place-row';
+import { RoutePath } from '@/features/routes/route-path';
 import { formatDistance, formatMinutes } from '@/lib/format';
 import { useTheme } from '@/theme/use-theme';
 
@@ -95,12 +95,7 @@ function RouteDetail({
         {plan.stops.length > 0 ? (
           <View style={styles.map}>
             <LensMap center={center} span={center.span}>
-              <Polyline
-                coordinates={path}
-                strokeColor={colors.accent}
-                strokeWidth={3}
-                lineDashPattern={[6, 6]}
-              />
+              <RoutePath coordinates={path} />
               {plan.stops.map((stop, index) => (
                 <PlaceMarker key={stop.place.id} place={stop.place} order={index + 1} />
               ))}
