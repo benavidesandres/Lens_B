@@ -103,5 +103,6 @@ export function assembleRoute(
     totalMinutes,
     isFree: routeStops.every((stop) => stop.place.isFree === true),
     stops: routeStops,
+    path: [],
   };
 }
