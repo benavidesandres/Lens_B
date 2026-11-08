@@ -124,6 +124,11 @@ export class WikipediaProvider {
       imageUrl: page.thumbnail?.source ?? null,
       builtIn: extractBuiltYear(extract),
       isFree: inferIsFreeFromKind(classification.kind),
+      rating: null,
+      ratingCount: null,
+      priceLevel: null,
+      priceRange: null,
+      openNow: null,
       source: 'wikipedia',
       wikipediaTitle: page.title,
     };

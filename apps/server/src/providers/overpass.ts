@@ -157,6 +157,11 @@ function toCandidate(element: OsmElement): PlaceCandidate | null {
     imageUrl: safeUrl(tags.image),
     builtIn: extractYear(tags.start_date),
     isFree: inferIsFreeFromOsm(tags, classification.category),
+    rating: null,
+    ratingCount: null,
+    priceLevel: null,
+    priceRange: null,
+    openNow: null,
     source: 'osm',
     wikipediaTitle: parseWikipediaTag(tags.wikipedia),
   };
