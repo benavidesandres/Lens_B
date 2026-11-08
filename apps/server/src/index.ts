@@ -12,7 +12,8 @@ const app = createApp(createDependencies(env, logger), { corsOrigin: env.CORS_OR
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {
   logger.info('Servidor LENS iniciado', {
     url: `http://${info.address}:${info.port}`,
-    ai: Boolean(env.ANTHROPIC_API_KEY),
+    ai: env.ANTHROPIC_API_KEY ? 'claude' : env.GROQ_API_KEY ? 'groq' : false,
+    google: Boolean(env.GOOGLE_MAPS_API_KEY),
   });
 });
 
