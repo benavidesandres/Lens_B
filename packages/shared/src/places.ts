@@ -2,7 +2,19 @@ import { z } from 'zod';
 
 import { CategorySchema } from './categories';
 
-export const PlaceSourceSchema = z.enum(['wikipedia', 'osm']);
+export const PlaceSourceSchema = z.enum(['wikipedia', 'osm', 'google']);
+
+// Nivel de precio de Google: 0 gratis, 1 económico, 2 moderado, 3 caro, 4 muy caro.
+export const PriceLevelSchema = z.number().int().min(0).max(4);
+export type PriceLevel = z.infer<typeof PriceLevelSchema>;
+
+// Rango aproximado de gasto por persona, en la moneda local (p. ej. COP).
+export const PriceRangeSchema = z.object({
+  min: z.number().nonnegative().nullable(),
+  max: z.number().nonnegative().nullable(),
+  currency: z.string().length(3),
+});
+export type PriceRange = z.infer<typeof PriceRangeSchema>;
 
 // Representación resumida de un lugar, usada en listas, mapa y rutas.
 export const PlaceSchema = z.object({
@@ -21,6 +33,14 @@ export const PlaceSchema = z.object({
   builtIn: z.string().nullable(),
   // null cuando la fuente no indica si la entrada es gratuita.
   isFree: z.boolean().nullable(),
+  // Los campos siguientes solo los aporta Google; con default(null) las rutas
+  // guardadas en el teléfono antes de añadirlos siguen siendo válidas.
+  rating: z.number().min(0).max(5).nullable().default(null),
+  ratingCount: z.number().int().nonnegative().nullable().default(null),
+  priceLevel: PriceLevelSchema.nullable().default(null),
+  priceRange: PriceRangeSchema.nullable().default(null),
+  // null cuando no se conoce el horario.
+  openNow: z.boolean().nullable().default(null),
   source: PlaceSourceSchema,
 });
 export type Place = z.infer<typeof PlaceSchema>;
@@ -31,6 +51,8 @@ export const PlaceDetailSchema = PlaceSchema.extend({
   openingHours: z.string().nullable(),
   website: z.url().nullable(),
   wikipediaUrl: z.url().nullable(),
+  phone: z.string().nullable().default(null),
+  mapsUrl: z.url().nullable().default(null),
 });
 export type PlaceDetail = z.infer<typeof PlaceDetailSchema>;
 
