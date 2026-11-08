@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev --workspace @lens/server",
     "dev:mobile": "npm run start --workspace @lens/mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
