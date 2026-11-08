@@ -1,9 +1,10 @@
 import Feather from '@expo/vector-icons/Feather';
 import type { ComponentProps } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme/use-theme';
 
+import { PressableScale } from './pressable-scale';
 import { Text } from './text';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -33,53 +34,59 @@ export function Button({
   const isDisabled = disabled || loading;
 
   const palette = {
-    primary: { background: colors.text, border: colors.text, foreground: colors.background },
-    secondary: { background: 'transparent', border: colors.borderStrong, foreground: colors.text },
+    primary: { background: colors.accent, border: colors.accent, foreground: colors.onAccent },
+    secondary: { background: colors.surface, border: colors.borderStrong, foreground: colors.text },
     ghost: { background: 'transparent', border: 'transparent', foreground: colors.accent },
   }[variant];
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.base,
         {
           backgroundColor: palette.background,
           borderColor: palette.border,
           borderRadius: radius.md,
-          paddingHorizontal: variant === 'ghost' ? spacing.xs : spacing.lg,
-          opacity: isDisabled ? 0.5 : pressed ? 0.75 : 1,
+          paddingHorizontal: variant === 'ghost' ? spacing.sm : spacing.lg,
+          // Durante la carga se mantiene el color: la acción sigue en curso.
+          opacity: disabled && !loading ? 0.45 : 1,
         },
         style,
       ]}>
-      {loading ? (
-        <ActivityIndicator color={palette.foreground} />
-      ) : (
-        <View style={[styles.content, { gap: spacing.sm }]}>
-          {icon ? <Feather name={icon} size={16} color={palette.foreground} /> : null}
-          <Text variant="bodyStrong" style={{ color: palette.foreground }}>
-            {label}
-          </Text>
-        </View>
-      )}
-    </Pressable>
+      <View style={[styles.content, { gap: spacing.sm }]}>
+        {loading ? (
+          <ActivityIndicator size="small" color={palette.foreground} />
+        ) : icon ? (
+          <Feather name={icon} size={18} color={palette.foreground} />
+        ) : null}
+        <Text
+          variant="bodyStrong"
+          numberOfLines={1}
+          style={[styles.label, { color: palette.foreground }]}>
+          {label}
+        </Text>
+      </View>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 46,
-    borderWidth: StyleSheet.hairlineWidth * 2,
+    minHeight: 52,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+    maxWidth: '100%',
   },
+  label: { flexShrink: 1 },
 });
