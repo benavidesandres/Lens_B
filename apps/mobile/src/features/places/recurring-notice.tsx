@@ -1,7 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import type { JournalPlace } from '@/features/journal/journal-schema';
 import { useTheme } from '@/theme/use-theme';
@@ -15,41 +16,36 @@ export function RecurringNotice({ entry }: { entry: JournalPlace }) {
 
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: entry.placeId } }} asChild>
-      <Pressable
+      <PressableScale
         accessibilityRole="link"
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: colors.accentMuted,
-            borderRadius: radius.md,
-            padding: spacing.lg,
-            gap: spacing.xs,
-            opacity: pressed ? 0.8 : 1,
-          },
-        ]}>
-        <View style={[styles.header, { gap: spacing.xs }]}>
-          <Feather name="repeat" size={12} color={colors.accent} />
+        pressedScale={0.98}
+        style={{
+          backgroundColor: colors.accentMuted,
+          borderRadius: radius.lg,
+          padding: spacing.lg,
+          gap: spacing.xs,
+        }}>
+        <View style={[styles.row, { gap: spacing.xs + 2 }]}>
+          <Feather name="repeat" size={13} color={colors.accent} />
           <Text variant="label" tone="accent">
             Has pasado por aquí {entry.passCount} veces
           </Text>
         </View>
         <Text variant="heading">{entry.name}</Text>
-        {entry.summary ? (
-          <Text tone="secondary" numberOfLines={2}>
-            {entry.summary}
-          </Text>
-        ) : (
-          <Text tone="secondary">Quizá sea el momento de detenerse a mirarlo.</Text>
-        )}
-        <Text variant="bodyStrong" tone="accent" style={{ marginTop: spacing.xs }}>
-          Conocer su historia
+        <Text tone="secondary" numberOfLines={2}>
+          {entry.summary ?? 'Quizá sea el momento de detenerse a mirarlo.'}
         </Text>
-      </Pressable>
+        <View style={[styles.row, { gap: spacing.xs, marginTop: spacing.xs }]}>
+          <Text variant="bodyStrong" tone="accent">
+            Conocer su historia
+          </Text>
+          <Feather name="arrow-right" size={16} color={colors.accent} />
+        </View>
+      </PressableScale>
     </Link>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {},
-  header: { flexDirection: 'row', alignItems: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center' },
 });
