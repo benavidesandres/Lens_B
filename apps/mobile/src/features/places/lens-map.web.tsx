@@ -10,6 +10,7 @@ export interface LensMapProps {
   span?: number;
   children?: ReactNode;
   onPress?: () => void;
+  bottomPadding?: number;
 }
 
 /**

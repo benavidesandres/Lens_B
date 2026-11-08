@@ -4,6 +4,7 @@ export interface PlaceMarkerProps {
   place: Place;
   selected?: boolean;
   order?: number;
+  visited?: boolean;
   onPress?: (place: Place) => void;
 }
 

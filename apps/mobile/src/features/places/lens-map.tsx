@@ -13,11 +13,13 @@ export interface LensMapProps {
   span?: number;
   children?: ReactNode;
   onPress?: () => void;
+  // Espacio inferior cubierto por la interfaz: mantiene centrado lo visible.
+  bottomPadding?: number;
 }
 
 /** Mapa base con el estilo sobrio de LENS en iOS y Android. */
 export const LensMap = forwardRef<MapView, LensMapProps>(function LensMap(
-  { center, span = 0.012, children, onPress },
+  { center, span = 0.012, children, onPress, bottomPadding = 0 },
   ref,
 ) {
   const { scheme } = useTheme();
@@ -32,6 +34,7 @@ export const LensMap = forwardRef<MapView, LensMapProps>(function LensMap(
         latitudeDelta: span,
         longitudeDelta: span,
       }}
+      mapPadding={{ top: 0, right: 0, left: 0, bottom: bottomPadding }}
       showsUserLocation
       showsMyLocationButton={false}
       showsPointsOfInterests={false}
