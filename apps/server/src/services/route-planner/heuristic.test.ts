@@ -19,6 +19,11 @@ function place(overrides: Partial<Place> & Pick<Place, 'id'>): Place {
     imageUrl: null,
     builtIn: null,
     isFree: true,
+    rating: null,
+    ratingCount: null,
+    priceLevel: null,
+    priceRange: null,
+    openNow: null,
     source: 'osm',
     ...overrides,
   };

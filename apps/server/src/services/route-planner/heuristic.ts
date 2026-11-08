@@ -59,7 +59,8 @@ export function planHeuristic(
 }
 
 function selectPool(places: Place[], intent: RouteIntent): Place[] {
-  let pool = places;
+  // Un lugar cerrado ahora no sirve para una ruta inmediata.
+  let pool = places.filter((place) => place.openNow !== false);
   if (intent.categories.length > 0) {
     const matching = pool.filter((place) => intent.categories.includes(place.category));
     // Si casi no hay lugares de esa categoría, se completa con el resto.
@@ -81,6 +82,10 @@ function interest(place: Place, intent: RouteIntent): number {
   if (place.builtIn) score += 0.5;
   if (intent.categories.includes(place.category)) score += 2;
   if (intent.freeOnly && place.isFree === true) score += 0.5;
+  // Calificación de Google, ponderada por el número de reseñas para no premiar un 5,0 con 2 votos.
+  if (place.rating !== null && place.ratingCount !== null && place.ratingCount >= 5) {
+    score += ((place.rating - 3.5) / 1.5) * Math.min(1, place.ratingCount / 100);
+  }
   return score;
 }
 
