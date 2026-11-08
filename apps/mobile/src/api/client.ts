@@ -67,7 +67,9 @@ export async function apiRequest<T>(
     throw new ApiRequestError(
       controller.signal.aborted
         ? 'El servidor tardó demasiado en responder.'
-        : 'No pudimos conectar con el servidor. Revisa tu conexión.',
+        : __DEV__
+          ? `No pudimos conectar con ${API_BASE_URL}. Comprueba que el servidor esté activo y que el teléfono use la misma red Wi-Fi que el computador.`
+          : 'No pudimos conectar con el servidor. Revisa tu conexión.',
       'NETWORK_ERROR',
       null,
     );
