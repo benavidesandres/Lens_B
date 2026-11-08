@@ -11,6 +11,17 @@ const EnvSchema = z.object({
     .transform((value) => (value?.trim() ? value.trim() : undefined)),
   ANTHROPIC_MODEL: z.string().default('claude-opus-5-5'),
   ANTHROPIC_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
+  // Alternativa a Claude: clave de Groq. Si hay clave de Anthropic, tiene prioridad.
+  GROQ_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value?.trim() ? value.trim() : undefined)),
+  GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+  // Google Maps Platform (Places API New + Routes API). Opcional y solo en el servidor.
+  GOOGLE_MAPS_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value?.trim() ? value.trim() : undefined)),
   WIKIPEDIA_LANG: z
     .string()
     .regex(/^[a-z]{2,3}$/)
