@@ -33,5 +33,8 @@ export const RoutePlanSchema = z.object({
   isFree: z.boolean(),
   stops: z.array(RouteStopSchema),
   engine: RouteEngineSchema,
+  // Trazado real por calles (Google Routes). Vacío si no se pudo calcular:
+  // la app une entonces las paradas en línea recta.
+  path: z.array(CoordinatesSchema).default([]),
 });
 export type RoutePlan = z.infer<typeof RoutePlanSchema>;
