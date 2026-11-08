@@ -1,13 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import { CATEGORY_LABELS, type Coordinates, type Place } from '@lens/shared';
+import { CATEGORY_LABELS, type Coordinates, type Place, type PriceRange } from '@lens/shared';
 import { z } from 'zod';
 
 import type { Logger } from '../../lib/logger';
 import { fitToBudget, type PickedStop } from './assemble';
 
 // Respuesta estructurada que se le pide al modelo.
-const AiRouteSchema = z.object({
+export const AiRouteSchema = z.object({
   title: z.string().describe('Título breve de la ruta, en español, sin emojis.'),
   summary: z.string().describe('Una o dos frases que expliquen por qué la ruta encaja.'),
   timeBudgetMinutes: z
@@ -24,21 +24,24 @@ const AiRouteSchema = z.object({
 });
 
 // El prompt de sistema es estable para aprovechar la caché de prompts.
-const SYSTEM_PROMPT = `Eres el planificador de rutas a pie de LENS, una app que ayuda a descubrir lugares interesantes cerca del usuario.
+export const SYSTEM_PROMPT = `Eres el planificador de rutas a pie de LENS, una app que ayuda a descubrir lugares interesantes cerca del usuario.
 
-Recibirás la petición del usuario y una lista de lugares candidatos reales (con id, tipo, distancia desde el usuario, coordenadas y si la entrada es gratuita).
+Recibirás la petición del usuario y una lista de lugares candidatos reales (con id, tipo, distancia desde el usuario, coordenadas, si la entrada es gratuita y, cuando se conocen, calificación, nivel de precio, rango de precios y si está abierto ahora).
 
 Reglas:
 - Usa solo lugares de la lista, citándolos por su id exacto. No inventes lugares ni datos.
 - Ordena las paradas para formar un recorrido a pie lógico, sin idas y vueltas: considera las coordenadas.
 - Respeta el tiempo disponible: la suma de tramos a pie (unos 60 metros por minuto en ciudad) y los tiempos de visita no debe superarlo.
 - Si la persona no quiere gastar dinero, usa solo lugares marcados como gratuitos.
+- Si menciona un presupuesto, respeta el nivel y el rango de precios. Nunca inventes precios: menciona solo los que aparecen en la lista.
+- No incluyas lugares marcados como cerrados ahora.
+- Ante lugares parecidos, prefiere los de mejor calificación con más reseñas.
 - Prefiere variedad y lugares con historia o algo concreto que contar.
 - Entre 2 y 6 paradas.
 - Escribe en español neutro, con tono sobrio e informativo. Sin emojis ni signos de exclamación.
 - Las notas deben basarse en la información proporcionada del lugar; si hay poca, describe lo que se puede observar según su tipo.`;
 
-const MAX_CANDIDATES = 40;
+export const MAX_CANDIDATES = 40;
 
 export interface AiRouteResult {
   title: string;
@@ -46,7 +49,12 @@ export interface AiRouteResult {
   stops: PickedStop[];
 }
 
-export class AiRouteComposer {
+/** Cualquier proveedor de IA capaz de componer una ruta (Claude, Groq...). */
+export interface RouteComposer {
+  compose(origin: Coordinates, prompt: string, candidates: Place[]): Promise<AiRouteResult | null>;
+}
+
+export class AiRouteComposer implements RouteComposer {
   private readonly client: Anthropic;
 
   constructor(
@@ -102,25 +110,46 @@ export class AiRouteComposer {
       return null;
     }
 
-    const seen = new Set<string>();
-    const stops: PickedStop[] = parsed.stops.flatMap((stop) => {
-      const place = byId.get(stop.placeId);
-      // Se descartan ids inventados o repetidos.
-      if (!place || seen.has(place.id)) return [];
-      seen.add(place.id);
-      const stayMinutes = Math.min(90, Math.max(3, stop.stayMinutes));
-      return [{ place, stayMinutes, note: stop.note.trim() }];
-    });
-
-    const budget = Math.min(240, Math.max(15, parsed.timeBudgetMinutes));
-    const fitted = fitToBudget(origin, stops, budget);
-    if (fitted.length === 0) return null;
-
-    return { title: parsed.title.trim(), summary: parsed.summary.trim(), stops: fitted };
+    return finalizeRoute(origin, parsed, byId);
   }
 }
 
-function buildUserMessage(origin: Coordinates, prompt: string, places: Place[]): string {
+/**
+ * Valida la respuesta del modelo contra los lugares reales: descarta ids
+ * inventados o repetidos, acota tiempos y recorta la ruta al presupuesto.
+ */
+export function finalizeRoute(
+  origin: Coordinates,
+  parsed: z.infer<typeof AiRouteSchema>,
+  byId: Map<string, Place>,
+): AiRouteResult | null {
+  const seen = new Set<string>();
+  const stops: PickedStop[] = parsed.stops.flatMap((stop) => {
+    const place = byId.get(stop.placeId);
+    // Se descartan ids inventados o repetidos.
+    if (!place || seen.has(place.id)) return [];
+    seen.add(place.id);
+    const stayMinutes = Math.min(90, Math.max(3, stop.stayMinutes));
+    return [{ place, stayMinutes, note: stop.note.trim() }];
+  });
+
+  const budget = Math.min(240, Math.max(15, parsed.timeBudgetMinutes));
+  const fitted = fitToBudget(origin, stops, budget);
+  if (fitted.length === 0) return null;
+
+  return { title: parsed.title.trim(), summary: parsed.summary.trim(), stops: fitted };
+}
+
+const PRICE_LEVEL_TEXT = ['gratis', 'económico', 'moderado', 'caro', 'muy caro'] as const;
+
+function formatPriceRange(range: PriceRange): string {
+  if (range.min !== null && range.max !== null)
+    return `${range.min}-${range.max} ${range.currency}`;
+  if (range.min !== null) return `desde ${range.min} ${range.currency}`;
+  return `hasta ${range.max} ${range.currency}`;
+}
+
+export function buildUserMessage(origin: Coordinates, prompt: string, places: Place[]): string {
   const lines = places.map((place) =>
     [
       `- id: ${place.id}`,
@@ -130,6 +159,12 @@ function buildUserMessage(origin: Coordinates, prompt: string, places: Place[]):
       `  coordenadas: ${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}`,
       `  gratuito: ${place.isFree === null ? 'desconocido' : place.isFree ? 'sí' : 'no'}`,
       place.builtIn ? `  año: ${place.builtIn}` : null,
+      place.rating !== null
+        ? `  calificación: ${place.rating.toFixed(1)}/5 (${place.ratingCount ?? 0} reseñas)`
+        : null,
+      place.priceLevel !== null ? `  nivel de precio: ${PRICE_LEVEL_TEXT[place.priceLevel]}` : null,
+      place.priceRange ? `  rango de precios: ${formatPriceRange(place.priceRange)}` : null,
+      place.openNow !== null ? `  abierto ahora: ${place.openNow ? 'sí' : 'no'}` : null,
       place.summary ? `  información: ${place.summary}` : null,
     ]
       .filter(Boolean)
