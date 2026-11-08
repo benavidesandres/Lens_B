@@ -22,5 +22,8 @@ export function Text({ variant = 'body', tone = 'primary', style, ...rest }: Tex
     onAccent: colors.onAccent,
   }[tone];
 
-  return <RNText {...rest} style={[typography[variant], { color }, style]} />;
+  // El límite respeta el tamaño de letra del sistema sin romper las tarjetas.
+  return (
+    <RNText maxFontSizeMultiplier={1.4} {...rest} style={[typography[variant], { color }, style]} />
+  );
 }
