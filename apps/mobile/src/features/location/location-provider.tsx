@@ -28,7 +28,14 @@ const LocationContext = createContext<LocationContextValue | null>(null);
 // Solo se notifica un cambio cuando el usuario se ha movido de verdad.
 const DISTANCE_INTERVAL_METERS = 20;
 
-export function LocationProvider({ children }: { children: ReactNode }) {
+export function LocationProvider({
+  children,
+  enabled,
+}: {
+  children: ReactNode;
+  // Mientras sea false no se pide el permiso ni se usa el GPS.
+  enabled: boolean;
+}) {
   const [status, setStatus] = useState<LocationStatus>('pending');
   const [coords, setCoords] = useState<Coordinates | null>(null);
   const [canAskAgain, setCanAskAgain] = useState(true);
@@ -66,6 +73,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, [applyPermission]);
 
   useEffect(() => {
+    if (!enabled) return;
     // Al iniciar solo se consulta el permiso; el diálogo lo dispara el usuario desde la interfaz.
     Location.getForegroundPermissionsAsync()
       .then((response) => (response.granted ? applyPermission(response) : requestPermission()))
@@ -87,7 +95,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       subscription.current?.remove();
       subscription.current = null;
     };
-  }, [applyPermission, requestPermission]);
+  }, [enabled, applyPermission, requestPermission]);
 
   const value = useMemo<LocationContextValue>(
     () => ({
