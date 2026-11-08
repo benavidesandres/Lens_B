@@ -157,6 +157,11 @@ const WIKI_RULES: ReadonlyArray<{ pattern: RegExp; category: Category; kind: str
 const WIKI_EXCLUDE =
   /\b(barrio|localidad|municipio|comuna|distrito|estacion|avenida|autopista|calle|carrera|empresa|banco|club|equipo|partido|universidad|colegio|hospital|ministerio|embajada|aeropuerto)\b/;
 
+// Se comprueba solo el inicio de la descripción: "punto de referencia en la
+// ciudad de Pasto" es un lugar; "ciudad y capital de..." o "asesinato de..." no.
+const WIKI_EXCLUDE_DESCRIPTION =
+  /^(antigu[oa] )?(ciudad|capital|pueblo|corregimiento|vereda|provincia|departamento|region|pais|valle|ente territorial|asesinato|batalla|atentado|masacre|suceso)\b/;
+
 /**
  * Clasifica un artículo de Wikipedia por su título y descripción.
  * Devuelve null cuando el artículo no describe un lugar visitable.
@@ -168,6 +173,7 @@ export function classifyWikipedia(
 ): Classification | null {
   const head = normalize(`${title} ${description ?? ''}`);
   if (WIKI_EXCLUDE.test(head)) return null;
+  if (description && WIKI_EXCLUDE_DESCRIPTION.test(normalize(description))) return null;
 
   const body = normalize((extract ?? '').slice(0, 240));
   // Primero se busca en título y descripción; el extracto solo desempata.
