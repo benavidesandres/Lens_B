@@ -10,6 +10,7 @@ import {
 import { TtlCache } from '../lib/cache';
 import { AppError, NotFoundError } from '../lib/errors';
 import type { Logger } from '../lib/logger';
+import type { GooglePlacesProvider } from '../providers/google-places';
 import { parseOsmId, type OverpassProvider } from '../providers/overpass';
 import { normalize } from '../providers/text';
 import type { PlaceCandidate } from '../providers/types';
@@ -19,9 +20,13 @@ const NEARBY_TTL_MS = 10 * 60 * 1000;
 // Si una fuente falló, el resultado parcial se guarda poco tiempo para reintentar pronto.
 const PARTIAL_NEARBY_TTL_MS = 60 * 1000;
 const DETAIL_TTL_MS = 60 * 60 * 1000;
+// Google tiene cuota diaria: su resultado se conserva aunque otra fuente falle.
+const GOOGLE_NEARBY_TTL_MS = 30 * 60 * 1000;
 const MAX_NEARBY_RESULTS = 80;
 // Dos elementos con el mismo nombre a menos de esta distancia son el mismo lugar.
 const DUPLICATE_DISTANCE_METERS = 120;
+// Distancia máxima para asociar un lugar de Google con un artículo de Wikipedia.
+const WIKI_MATCH_DISTANCE_METERS = 300;
 
 export class PlacesService {
   private readonly nearbyCache = new TtlCache<{ candidates: PlaceCandidate[]; complete: boolean }>(
@@ -30,12 +35,20 @@ export class PlacesService {
   private readonly detailCache = new TtlCache<Omit<PlaceDetail, 'distanceMeters' | 'walkMinutes'>>(
     DETAIL_TTL_MS,
   );
+  private readonly googleNearbyCache = new TtlCache<PlaceCandidate[]>(GOOGLE_NEARBY_TTL_MS);
 
   constructor(
     private readonly wikipedia: WikipediaProvider,
     private readonly overpass: OverpassProvider,
     private readonly logger: Logger,
+    // Opcional: sin clave de Google la app funciona con OSM y Wikipedia.
+    private readonly google: GooglePlacesProvider | null = null,
   ) {}
+
+  /** Expone el proveedor para el proxy de fotos. */
+  get googlePlaces(): GooglePlacesProvider | null {
+    return this.google;
+  }
 
   async nearby(query: NearbyQuery): Promise<Place[]> {
     const center: Coordinates = { lat: query.lat, lon: query.lon };
@@ -65,32 +78,39 @@ export class PlacesService {
     return this.nearbyCache.getOrLoad(
       key,
       async () => {
-        const [osm, wiki] = await Promise.allSettled([
+        const [google, osm, wiki] = await Promise.allSettled([
+          this.google
+            ? this.googleNearbyCache.getOrLoad(key, () => this.google!.nearby(center, radius))
+            : Promise.resolve([]),
           this.overpass.nearby(center, radius),
           this.wikipedia.nearby(center, radius),
         ]);
+        const sources = { google, osm, wiki };
 
-        if (osm.status === 'rejected' && wiki.status === 'rejected') {
-          this.logger.error('Ambos proveedores fallaron', {
-            osm: describeError(osm.reason),
-            wiki: describeError(wiki.reason),
-          });
-          throw osm.reason;
+        for (const [name, result] of Object.entries(sources)) {
+          if (result.status === 'rejected') {
+            this.logger.warn('Proveedor de lugares no disponible', {
+              provider: name,
+              reason: describeError(result.reason),
+            });
+          }
         }
-        // Si solo falla uno, se responde con lo disponible en lugar de fallar.
-        if (osm.status === 'rejected') {
-          this.logger.warn('Overpass no disponible', { reason: describeError(osm.reason) });
-        }
-        if (wiki.status === 'rejected') {
-          this.logger.warn('Wikipedia no disponible', { reason: describeError(wiki.reason) });
+        // Si todas las fuentes fallan se informa del error; si falla alguna, se responde con el resto.
+        if (Object.values(sources).every((result) => result.status === 'rejected')) {
+          this.logger.error('Todos los proveedores de lugares fallaron');
+          throw google.status === 'rejected'
+            ? google.reason
+            : wiki.status === 'rejected'
+              ? wiki.reason
+              : new Error('Sin proveedores');
         }
 
+        const value = <T>(result: PromiseSettledResult<T[]>): T[] =>
+          result.status === 'fulfilled' ? result.value : [];
         return {
-          candidates: mergeCandidates(
-            osm.status === 'fulfilled' ? osm.value : [],
-            wiki.status === 'fulfilled' ? wiki.value : [],
-          ),
-          complete: osm.status === 'fulfilled' && wiki.status === 'fulfilled',
+          // Google va primero: ante duplicados con OSM se conserva su ficha, más completa.
+          candidates: mergeCandidates([...value(google), ...value(osm)], value(wiki)),
+          complete: Object.values(sources).every((result) => result.status === 'fulfilled'),
         };
       },
       (result) => (result.complete ? NEARBY_TTL_MS : PARTIAL_NEARBY_TTL_MS),
@@ -113,6 +133,37 @@ export class PlacesService {
         openingHours: null,
         website: null,
         wikipediaUrl: article.url,
+        phone: null,
+        mapsUrl: null,
+      };
+    }
+
+    if (id.startsWith('google:')) {
+      const placeId = id.slice('google:'.length);
+      if (!this.google || !/^[w-]{10,300}$/.test(placeId)) throw invalidId();
+      const place = await this.google.byId(placeId);
+      if (!place) throw new NotFoundError('No encontramos este lugar.');
+
+      // Si Wikipedia tiene un artículo con el mismo nombre y en el mismo sitio,
+      // se añade su historia. La distancia evita confundir "Café Central" con otro.
+      const found = await this.wikipedia.byTitle(place.candidate.name).catch(() => null);
+      const article =
+        found && distanceMeters(found.candidate, place.candidate) < WIKI_MATCH_DISTANCE_METERS
+          ? found
+          : null;
+      const { wikipediaTitle: _omit, ...candidate } = place.candidate;
+      return {
+        ...candidate,
+        summary: candidate.summary ?? article?.candidate.summary ?? null,
+        imageUrl: candidate.imageUrl ?? article?.candidate.imageUrl ?? null,
+        builtIn: article?.candidate.builtIn ?? null,
+        description: article?.description ?? null,
+        address: place.address,
+        openingHours: place.openingHours,
+        website: place.website,
+        wikipediaUrl: article?.url ?? null,
+        phone: place.phone,
+        mapsUrl: place.mapsUrl,
       };
     }
 
@@ -144,6 +195,8 @@ export class PlacesService {
         openingHours: osm.openingHours,
         website: osm.website,
         wikipediaUrl: article?.url ?? null,
+        phone: null,
+        mapsUrl: null,
       };
     }
 
